@@ -1,0 +1,35 @@
+import torch
+import deepxde as dde
+import numpy as np
+import matplotlib.pyplot as plt
+pi = torch.pi
+
+def ode_system(t, u):
+    du_t = dde.grad.jacobian(u, t)
+    return du_t - torch.cos(2*pi*t)
+def boundary(t, on_initial):
+    return on_initial and np.isclose(t[0], 0)
+geom = dde.geometry.TimeDomain(0, 2)
+
+ic = dde.IC(geom, lambda t: 1, boundary)
+
+# Reference solution to compute the error
+def true_solution(t):
+    return np.sin(2*np.pi*t)/(2*np.pi) + 1
+
+data = dde.data.PDE(geom,
+                    ode_system,
+                    ic,
+                    num_domain = 30,
+                    num_boundary = 2,
+                    solution = true_solution,
+                    num_test = 100)
+layer_size = [1] + [32] + [1]
+activation = "tanh"
+initializer = "Glorot uniform"
+
+NN = dde.maps.FNN(layer_size, activation, initializer
+model = dde.Model(data, NN)
+model.compile("adam", lr = 0.001)
+losshistory, train_state = model.train(epochs = 6000)
+dde.saveplot(losshistory, train_state, issave = False, isplot = True)
